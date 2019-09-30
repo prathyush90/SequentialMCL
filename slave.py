@@ -42,6 +42,7 @@ class Particle(object):
 
         return adjustedValue
     def move(self,heading,noise,distance, isRobot):
+
         if(isRobot):
             turn = (heading + (random.random() * 2 - 1.0) * noise)* math.pi / 180.0
         else:
@@ -57,14 +58,14 @@ class Particle(object):
         return deepcopy(self)
 
     def gaussian(self, mu, sigma, predictedValue):
-        num = -0.5 * pow((mu -predictedValue)/sigma,2)
+        num = -0.5 * pow(-1*(mu -predictedValue)/sigma,2)
         num = math.exp(num)
         den = math.sqrt(2 * math.pi)*sigma+0.00000000000000000000000000005
         return num/den
 
     def measurementProbability(self, robotPos):
-        rmse  = math.sqrt(math.pow(self.x - robotPos[0], 2) + math.pow(self.y - robotPos[1], 2))/5
-        sigma = 0.5
+        rmse  = math.sqrt(math.pow(self.x - robotPos[0], 2) + math.pow(self.y - robotPos[1], 2))
+        sigma = 3.0
         gauss = self.gaussian(0,sigma, rmse)
         prob  = math.sqrt(gauss)
         self.weight *= prob

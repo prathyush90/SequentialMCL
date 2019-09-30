@@ -24,12 +24,9 @@ class slaveManager(object):
         self.previoussmoothing = 0.8
         self.isBusy = False
         self.slaveDiff = []
-        #self.placeMagnets()
-        self.walkAroundTheGrid()
-        self.trainKDTree()
-        self.initialLocation = True
+        self.initialLocation = False
         self.previousHeading = 0;
-
+        self.converged = False
 
 
 
@@ -69,75 +66,114 @@ class slaveManager(object):
 
     def move(self,turn_steer,distance, turn_deg):
         turn = turn_deg
-        print(turn)
+
         self.previousHeading = turn_steer;
         for number in range(self.particleSize):
             particle = self.slaves[number]
             #particle.setNoise(self.forward_noise, self.turn_noise)
 
 
-            headingMean = random.random()*360
-            headingStd = 10
+
+            headingStd = 5.0
 
 
-            particle = particle.move(turn,headingStd, distance, False)
+            particle = particle.move(turn_deg,headingStd, distance, False)
             self.slaves[number] = particle
 
         self.robot = self.robot.move(turn_steer,0, distance, True)
         weights = []
 
 
-        Y = np.array(self.getStrengthAtPoint(self.robot.getX(), self.robot.getY()))
-        # Y = Y.reshape(-1, 2)
-        # Y = self.neigh.predict(Y)
+
+
         val = [self.robot.getX(), self.robot.getY()]
-        #pred_robot = self.sigmoid(poww)
-        # num = random.random()*10
-        # if(num < 2):
-        #     self.initialLocation = False
-        #     #print("beacon too")
+
         for number in range(self.particleSize):
             particle = self.slaves[number]
-
-            # Y_Particle = np.array([particle.getX(), particle.getY()])
-            # Y_Particle = Y_Particle.reshape(-1, 2)
-            # Y_Particle_array = self.neigh.kneighbors(Y_Particle)
-            # val_for_particle = self.returnValue(Y_Particle_array, Y_Particle)
-            # val_particle = [particle.getX(), particle.getY()]
-            #pred = self.sigmoid(powww)
-            weight   = 1
-            if(not self.initialLocation):
-                weight   = particle.measurementProbability([self.robot.getX(), self.robot.getY()])
-
-            #weight   *= particle.measurementProbabilityForDistribution(Y, val_for_particle)
             weight = particle.measurementProbability([self.robot.getX(), self.robot.getY()])
             weights.append(weight)
-        self.initialLocation = True
+
         #self.previousx,self.previousy = self.posx*(1-self.previoussmoothing) + self.previoussmoothing*self.previousx , self.posy*(1-self.previoussmoothing)+self.previoussmoothing*self.previousy
         self.posx, self.posy, self.heading = self.getUserPosition(weights)
-        print(self.heading)
+        weight_max = max(weights)
+        index = weights.index(weight_max)
+
+        threshold = self.gaussian(0, 3, 10)
+        if(weight < threshold and self.initialLocation):
+            print("robot kidnapped")
+            self.transformParticles(index)
+        self.initialLocation = True
         self.normalizeParticleWeights()
         self.checkNeedForResample()
-        min_weight = min(weights)
-        max_weigth = max(weights)
-        # #print("-----")
-        # print(max_weigth)
-        # print(min_weight)
-        # #print("-----")
-        #check      = min_weight/max_weigth
-        # if(check >= 0.1):
-        #     self.avoidResample = True
+
 
         self.resample(weights)
-        #self.getHeading()
         self.previousx, self.previousy = self.posx, self.posy
         self.count += 1
 
-        #self.calculateVariance()
-
-        # if(abs(self.heading - turn) > 90):
-        #     self.heading += 180
         self.isBusy = False
+
+    def measurementProbability(self, currentPos, robotPos):
+        rmse  = math.sqrt(math.pow(currentPos[0] - robotPos[0], 2) + math.pow(currentPos[1] - robotPos[1], 2))
+        # sigma = 3.0
+        # gauss = self.gaussian(0,sigma, rmse)
+        # prob  = math.sqrt(gauss)
+
+        return rmse
+
+    def adjustCordinates(self, value, index):
+        adjustedValue = value
+        if (value < self.geofence[index][0]):
+            adjustedValue = self.geofence[index][1] - self.geofence[index][0] + value
+        elif (value > self.geofence[index][1]):
+            adjustedValue = self.geofence[index][0] + value - self.geofence[index][1]
+
+        return adjustedValue
+
+    def transformParticles(self, index):
+        particle = self.slaves[index]
+        p = [particle.getX(), particle.getY()]
+        #print(p)
+        dp = [1, 1]
+        b_error = self.measurementProbability(p, [self.robot.getX(), self.robot.getY()])
+        while(sum(dp) > 0.2):
+            for i in range(0,len(p)):
+                p[i] += dp[i]
+                p[i] = self.adjustCordinates(p[i], i)
+                error = self.measurementProbability(p, [self.robot.getX(), self.robot.getY()])
+                if error < b_error:
+                    b_error = error
+                    dp[i] *= 1.1
+                else:
+                    p[i] -= 2 * dp[i]
+                    p[i] = self.adjustCordinates(p[i], i)
+                    error = self.measurementProbability(p, [self.robot.getX(), self.robot.getY()])
+
+                    if error < b_error:
+                        b_error = error
+                        dp[i] *= 1.1
+                    else:
+                        p[i] += dp[i]
+                        p[i] = self.adjustCordinates(p[i], i)
+                        dp[i] *= 0.9
+        print("transformed")
+        # print(p)
+        # print([self.robot.getX(), self.robot.getY()])
+        self.slaves = []
+        for number in range(self.particleSize):
+
+            x           = p[0]
+            y           = p[1]
+            orientation = random.random()*360
+            particle    = Particle(x, y, orientation, self.geofence)
+            particle.setNoise(self.forward_noise, self.turn_noise)
+            self.slaves.append(particle)
+
+    def gaussian(self, mu, sigma, predictedValue):
+        num = -0.5 * pow((predictedValue-mu)/sigma,2)
+        num = math.exp(num)
+        den = math.sqrt(2 * math.pi)*sigma+0.00000000000000000000000000005
+        return num/den
 
     def returnValue(self, Y_particle_array, particle):
 
@@ -206,6 +242,7 @@ class slaveManager(object):
         # else:
         #     #self.avoidResample = False
         orientation = 0
+
         index_max = np.argmax(np.array(weights))
         first_particle_weight = (self.slaves[0].getWeight()/sumWeight)
         for index,particle in enumerate(self.slaves):
@@ -225,6 +262,9 @@ class slaveManager(object):
         #     return self.posx,self.posy
         if(count == 0):
             count = 0.00000000000000000001
+
+        else:
+            self.converged = True
         xmean /= count
         ymean /= count
         orientation /= count
@@ -473,6 +513,13 @@ class slaveManager(object):
             self.heading %= 360
         else:
             self.heading = random.random()*360
+
+    def kidnapRobot(self):
+        robot_x = random.random() * (self.geofence[0][1] - self.geofence[0][0]) + self.geofence[0][0]
+        robot_y = random.random() * (self.geofence[1][1] - self.geofence[1][0]) + self.geofence[1][0]
+        self.robot = Particle(robot_x, robot_y, self.robot.orientation, self.geofence)
+        self.robot.setNoise(0, 0)
+
 
 
 

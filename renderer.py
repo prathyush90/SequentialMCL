@@ -18,7 +18,7 @@ COLOR = { "white": (255, 255, 255),
 initialheading = 0
 pygame.init()
 window = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT), 0, 32)
-particlemanager = Manager([[0, WINDOWWIDTH], [0, WINDOWHEIGHT]], 500)
+particlemanager = Manager([[0, WINDOWWIDTH], [0, WINDOWHEIGHT]], 1000)
 particlemanager.initSlaves()
 fpsClock = pygame.time.Clock()
 
@@ -92,5 +92,8 @@ while True:
         initialheading %= 360
         particlemanager.move(initialheading, 0.5, 0)
         #initialheading = copyheading
+    if (key_pressed[settings.K_r]):
+        #reset robot position(kidnap)
+        particlemanager.kidnapRobot()
     renderOnScreen()
 
