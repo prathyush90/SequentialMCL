@@ -37,7 +37,7 @@ Find the screenshots attached below.
 
 ![kidnapped](https://github.com/prathyush90/SequentialMCL/blob/master/Images/robot_kidnapped.png)
 
-3) Converging after Kidnap
+5) Converging after Kidnap
 
 
 ![afterkidnap](https://github.com/prathyush90/SequentialMCL/blob/master/Images/convergingfrom_kidnap.png)
