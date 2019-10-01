@@ -10,7 +10,7 @@ To run the project
 
 Uses pygame to render the balls and particles onto the screen.
 
-When r is pressed the blue ball is transported to some random place on the screen, from there the redball will predict the pose  in few steps. You can read more about robot Kidnapping from here https://en.wikipedia.org/wiki/Kidnapped_robot_problem
+When r is pressed the blue ball is transported to some random location on the screen, from there the redball will predict the pose  in few steps. You can read more about robot Kidnapping from here https://en.wikipedia.org/wiki/Kidnapped_robot_problem
 
 
 Green Circles represent particles. Blue ball the actual location and red ball the predicted location from the set of the particles. The sticks on blue ball points to the actual heading direction and the stick on the red ball points to the predicted heading direction
